@@ -43,6 +43,10 @@ def metersToRSSI(meters):
         return base_factor -10 * env_factor * math.log10(meters)
 
 
+def RSSItoMeters(RSSI):
+    return 10 ^ ((-69 - RSSI) / (10*2))
+
+
 ################################################
 # credit: https://stackoverflow.com/questions/47410054/generate-random-locations-within-a-triangular-domain
 def point_on_triangle2(pt1, pt2, pt3):
@@ -55,31 +59,38 @@ def point_on_triangle2(pt1, pt2, pt3):
     return (
         s * pt1[0] + t * pt2[0] + u * pt3[0],
         s * pt1[1] + t * pt2[1] + u * pt3[1],
-        pt1[2] + pt2[2] + pt3[2] / 3
+        #pt1[2] + pt2[2] + pt3[2] / 3
     )
 
 
-def weightsMeasureRelativetoSensor(sensor, measurePoints):
-    n = len(measurePoints)
+def weightsMeasureRelativetoSensor(OriginalPoint, RandomPoints):
+    n = len(RandomPoints)
     weights = []
     for i in range(0, n):
-        weights.append(weightDistanceEuclidean(sensor, measurePoints[i]))
+        # Get Dists of Particle
+        RandomParticleToCompare = []
+        RandomParticleToCompare.append(distanceBetweenCoords(RandomPoints[i], gateways[0]))
+        RandomParticleToCompare.append(distanceBetweenCoords(RandomPoints[i], gateways[1]))
+        RandomParticleToCompare.append(distanceBetweenCoords(RandomPoints[i], gateways[2]))
+        # Weight against original
+        weights.append(weightDistanceEuclidean(OriginalPoint, RandomParticleToCompare))
     return weights
 
 
 def weightDistanceEuclidean(sensor, point):
     divider = np.sqrt((sensor[0] - point[0])**2 + (sensor[1] - point[1])**2)
-    if divider == 0:
-        return 0
+    # bound the upper limit
+    if divider < 0.000001:
+        return 100000
     else:
         return 1 / divider
 
 
 def normalizeWeights(weights):
     n = len(weights)
-    sum = 0
-    for i in range(0, n):
-        sum += weights[i]
+    sum = np.sum(weights)
+    #for i in range(0, n):
+    #    sum += weights[i]
     for i in range(0, n):
         weights[i] = weights[i] / sum
     return weights
@@ -124,6 +135,8 @@ def completeSystematicResampling(samples, weights):
     return newSamples
 
 
+
+
 # credit: https://stackoverflow.com/questions/1185408/converting-from-longitude-latitude-to-cartesian-coordinates
 def get_cartesian(point):
     lat = point[0]
@@ -143,63 +156,79 @@ def get_latlon(x,y,z):
     lon = np.degrees(np.arctan2(y, x))
 
 
-def particle_filter_v1():
-    pt1 = (28.248, -25.75307)
-    pt1 = get_cartesian(pt1)
-    pt2 = (28.24802, -25.75271)
-    pt2 = get_cartesian(pt2)
-    pt3 = (28.24867, -25.75277)
-    pt3 = get_cartesian(pt3)
-    points = [point_on_triangle2(pt1, pt2, pt3) for _ in range(1000)]
-    x, y, z = zip(*points)
-    plt.scatter(x, y, s=0.1)
-    plt.show()
-    for i in range(0, len(sensorSet)):
-        for j in range(0, 3):
-            weights = weightsMeasureRelativetoSensor(sensorSet[i], points)
-            weights = normalizeWeights(weights)
-            weightedSample = sampleByWeight(weights, list(range(0, 1000)), 1000)
-            points = getSamplesFromIndexes(weightedSample, points)
-            x, y, z = zip(*points)
-            plt.scatter(x, y, s=0.1)
-            plt.show()
+# def particle_filter_v1():
+#     pt1 = (28.248, -25.75307)
+#     pt1 = get_cartesian(pt1)
+#     pt2 = (28.24802, -25.75271)
+#     pt2 = get_cartesian(pt2)
+#     pt3 = (28.24867, -25.75277)
+#     pt3 = get_cartesian(pt3)
+#     points = [point_on_triangle2(pt1, pt2, pt3) for _ in range(1000)]
+#     x, y, z = zip(*points)
+#     plt.scatter(x, y, s=0.1)
+#     plt.show()
+#     for i in range(0, len(sensorSet)):
+#         for j in range(0, 3):
+#             weights = weightsMeasureRelativetoSensor(sensorSet[i], points)
+#             weights = normalizeWeights(weights)
+#             weightedSample = sampleByWeight(weights, list(range(0, 1000)), 1000)
+#             points = getSamplesFromIndexes(weightedSample, points)
+#             x, y, z = zip(*points)
+#             plt.scatter(x, y, s=0.1)
+#             plt.show()
 
 
-# with degeneracy protection
+####################################################
+# with degeneracy adjustments
 def particle_filter_v2(sampleSize):
-    pt1 = (28.248, -25.75307)
-    pt1 = get_cartesian(pt1)
-    pt2 = (28.24802, -25.75271)
-    pt2 = get_cartesian(pt2)
-    pt3 = (28.24867, -25.75277)
-    pt3 = get_cartesian(pt3)
-    points = [point_on_triangle2(pt1, pt2, pt3) for _ in range(sampleSize)]
-    x, y, z = zip(*points)
-    #plt.scatter(x, y, s=0.1)
-    plt.hist2d(x,y)
+    # sample uniform particles
+    points = [point_on_triangle2(gateways[0], gateways[1], gateways[2]) for _ in range(sampleSize)]
+    lats, longs = zip(*points)
+    plt.scatter(longs, lats, s=0.1)
+    #plt.hist2d(longs, lats)
     plt.show()
-    for i in range(0, len(sensorSet)):
-        for j in range(0, 1000):
-            weights = weightsMeasureRelativetoSensor(sensorSet[i], points)
+
+    # change reading
+    for i in range(2, len(sensorSet)):
+        # get RSSI of reading, here I use the diff of lat long for simulation
+        readingMeasurement = []
+        readingMeasurement.append(distanceBetweenCoords(sensorSet[i], gateways[0]))
+        readingMeasurement.append(distanceBetweenCoords(sensorSet[i], gateways[1]))
+        readingMeasurement.append(distanceBetweenCoords(sensorSet[i], gateways[2]))
+
+        # train to reading
+        for j in range(0, 100):
+
+            # get weights based on closeness to original reading
+            weights = weightsMeasureRelativetoSensor(readingMeasurement, points)
+            # Normalize to a distribution
             weights = normalizeWeights(weights)
+
+            # Check for Degeneracy
             nEff = computeDegeneracy(weights)
-            if (sampleSize - nEff) / sampleSize > 0.8:
+            #print("Neff: ", nEff)
+            #if (sampleSize - nEff) / sampleSize > 0.8:
+
+            if nEff < sampleSize / 4:
                 print('regen\n')
-                points = completeSystematicResampling(points, weights)
+                # TODO need to check
+                # points = completeSystematicResampling(points, weights)
                 for k in range(0, len(weights)):
                     weights[k] = 1 / sampleSize
             else:
+                # Generate Indexes of new Sample
                 weightedSample = sampleByWeight(weights, list(range(0, sampleSize)), sampleSize)
+
+                # Create new sample from indexes
                 points = getSamplesFromIndexes(weightedSample, points)
-        x, y, z = zip(*points)
-        plt.hist2d(x, y)
+
+        lats, longs = zip(*points)
+        plt.scatter(longs, lats, s=0.1)
+        #plt.hist2d(longs, lats)
         plt.show()
-
-
-
 
 ################################################
 
-particle_filter_v2(10000)
+particle_filter_v2(1000)
 
 #print(rssiInfoFromSensor([-25.75285636635823,28.24830651283264]))
