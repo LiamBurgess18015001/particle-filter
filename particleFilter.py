@@ -65,6 +65,26 @@ def RSSItoMeters(RSSI):
     return 10 ^ ((-69 - RSSI) / (10 * 2))
 
 
+# credit: https://stackoverflow.com/questions/1185408/converting-from-longitude-latitude-to-cartesian-coordinates
+def get_cartesian(point):
+    lat = point[0]
+    lon = point[1]
+    lat, lon = np.deg2rad(lat), np.deg2rad(lon)
+    R = 6371  # radius of the earth
+    x = R * np.cos(lat) * np.cos(lon)
+    y = R * np.cos(lat) * np.sin(lon)
+    z = R * np.sin(lat)
+    return [x, y, z]
+
+
+# credit: https://stackoverflow.com/questions/56945401/converting-xyz-coordinates-to-longitutde-latitude-in-python
+def get_latlon(x, y, z):
+    R = 6371
+    lat = np.degrees(np.arcsin(z / R))
+    lon = np.degrees(np.arctan2(y, x))
+
+
+
 ################################################
 # credit: https://stackoverflow.com/questions/47410054/generate-random-locations-within-a-triangular-domain
 def point_on_triangle2(pt1, pt2, pt3):
@@ -117,6 +137,8 @@ def normalizeWeights(weights):
 def sampleByWeight(weights, points, howMany):
     return np.random.choice(points, howMany, p=weights)
 
+#######################################################
+
 
 def getSamplesFromIndexes(indexes, points):
     n = len(indexes)
@@ -153,27 +175,6 @@ def completeSystematicResampling(samples, weights):
     return newSamples
 
 
-# credit: https://stackoverflow.com/questions/1185408/converting-from-longitude-latitude-to-cartesian-coordinates
-def get_cartesian(point):
-    lat = point[0]
-    lon = point[1]
-    lat, lon = np.deg2rad(lat), np.deg2rad(lon)
-    R = 6371  # radius of the earth
-    x = R * np.cos(lat) * np.cos(lon)
-    y = R * np.cos(lat) * np.sin(lon)
-    z = R * np.sin(lat)
-    return [x, y, z]
-
-
-# credit: https://stackoverflow.com/questions/56945401/converting-xyz-coordinates-to-longitutde-latitude-in-python
-def get_latlon(x, y, z):
-    R = 6371
-    lat = np.degrees(np.arcsin(z / R))
-    lon = np.degrees(np.arctan2(y, x))
-
-
-####################################################################
-
 def multinomialResampling(points, weights):
     newPoints = []
     N_samples = len(points)
@@ -198,6 +199,33 @@ def multinomialResampling(points, weights):
     return newPoints, weights
 
 
+def stratifiedResampling(points, weights):
+    newPoints = []
+    N_samples = len(points)
+    n = 0
+
+    cumulativeDist = []
+    cumulativeDist.append(weights[0])
+    for i in range(1, N_samples):
+        cumulativeDist.append(weights[i] + cumulativeDist[i - 1])
+
+    m = 1
+
+    while n < N_samples:
+        u0 = np.random.uniform(0,1/N_samples)
+        u = u0 + n / N_samples
+
+        while cumulativeDist[m] < u:
+            m += 1
+        n += 1
+        newPoints.append(points[m])
+
+    for i in range(0, N_samples):
+        weights[i] = 1 / N_samples
+    return newPoints, weights
+
+
+####################################################################
 
 # def particle_filter_v1():
 #     pt1 = (28.248, -25.75307)
@@ -242,7 +270,7 @@ def particle_filter_v2(sampleSize):
         readingMeasurement.append(distanceBetweenCoords(sensorSet[i], gateways[2]))
 
         # train to reading
-        for j in range(0, 10):
+        for j in range(0, 5):
 
             # get weights based on closeness to original reading
             weights = weightsMeasureRelativetoSensor(readingMeasurement, points)
@@ -257,7 +285,7 @@ def particle_filter_v2(sampleSize):
             if nEff < sampleSize / 2:
                 # TODO need to check
                 # points = completeSystematicResampling(points, weights)
-                points, weights = multinomialResampling(points, weights)
+                points, weights = stratifiedResampling(points, weights)
             else:
                 # Generate Indexes of new Sample
                 weightedSample = sampleByWeight(weights, list(range(0, sampleSize)), sampleSize)
