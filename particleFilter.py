@@ -3,20 +3,38 @@ import math as math
 import numpy as np
 import matplotlib.pyplot as plt
 
-gateways = [[-25.75307, 28.248],
-           [-25.75271, 28.24802],
-           [-25.75277, 28.24867]]
+# gateways = [[-25.75307, 28.248],
+#            [-25.75271, 28.24802],
+#            [-25.75277, 28.24867]]
 
-sensorSet = [[-25.752857574259657, 28.24808120727539],
-             [-25.752857574259657, 28.24814021587372],
-             [-25.752852742653914, 28.24819654226303],
-             [-25.752847911047994, 28.248259574174877],
-             [-25.75285153475245, 28.24831187725067],
-             [-25.752880524384196, 28.248364180326462],
-             [-25.752920385116287, 28.248408436775208],
-             [-25.752951790532148, 28.24845001101494],
-             [-25.75295058263169, 28.248509019613266],
-             [-25.75290951400886, 28.248547911643982]]
+gateways = [[28.251326680183407,
+             -25.750026219611552],
+            [28.250766098499298,
+             -25.7485911898637],
+            [28.249990940093994,
+             -25.74900189038381]]
+
+# sensorSet = [[-25.752857574259657, 28.24808120727539],
+#              [-25.752857574259657, 28.24814021587372],
+#              [-25.752852742653914, 28.24819654226303],
+#              [-25.752847911047994, 28.248259574174877],
+#              [-25.75285153475245, 28.24831187725067],
+#              [-25.752880524384196, 28.248364180326462],
+#              [-25.752920385116287, 28.248408436775208],
+#              [-25.752951790532148, 28.24845001101494],
+#              [-25.75295058263169, 28.248509019613266],
+#              [-25.75290951400886, 28.248547911643982]]
+
+sensorSet = [[28.25106382369995,
+              -25.74964209718626],
+             [28.25086534023285,
+              -25.749335281526573],
+             [28.250790238380432,
+              -25.748929413924614],
+             [28.25038254261017,
+              -25.748861769189467],
+             [28.25036108493805,
+              -25.74919032897078]]
 
 base_factor = -61.1
 env_factor = 2
@@ -26,7 +44,7 @@ def distanceBetweenCoords(p1, p2):
     p = 0.017453292519943295
     c = math.cos
     a = 0.5 - c((p2[0] - p1[0]) * p) / 2 + c(p1[0] * p) * c(p2[0] * p) * (1 - c((p2[1] - p1[1]) * p)) / 2
-    return 12742 * math.asin(math.sqrt(a))*1000
+    return 12742 * math.asin(math.sqrt(a)) * 1000
 
 
 def rssiInfoFromSensor(sensorLocation):
@@ -40,11 +58,11 @@ def metersToRSSI(meters):
     if meters <= 1:
         return base_factor
     else:
-        return base_factor -10 * env_factor * math.log10(meters)
+        return base_factor - 10 * env_factor * math.log10(meters)
 
 
 def RSSItoMeters(RSSI):
-    return 10 ^ ((-69 - RSSI) / (10*2))
+    return 10 ^ ((-69 - RSSI) / (10 * 2))
 
 
 ################################################
@@ -59,7 +77,7 @@ def point_on_triangle2(pt1, pt2, pt3):
     return (
         s * pt1[0] + t * pt2[0] + u * pt3[0],
         s * pt1[1] + t * pt2[1] + u * pt3[1],
-        #pt1[2] + pt2[2] + pt3[2] / 3
+        # pt1[2] + pt2[2] + pt3[2] / 3
     )
 
 
@@ -78,7 +96,7 @@ def weightsMeasureRelativetoSensor(OriginalPoint, RandomPoints):
 
 
 def weightDistanceEuclidean(sensor, point):
-    divider = np.sqrt((sensor[0] - point[0])**2 + (sensor[1] - point[1])**2)
+    divider = np.sqrt((sensor[0] - point[0]) ** 2 + (sensor[1] - point[1]) ** 2)
     # bound the upper limit
     if divider < 0.000001:
         return 100000
@@ -89,7 +107,7 @@ def weightDistanceEuclidean(sensor, point):
 def normalizeWeights(weights):
     n = len(weights)
     sum = np.sum(weights)
-    #for i in range(0, n):
+    # for i in range(0, n):
     #    sum += weights[i]
     for i in range(0, n):
         weights[i] = weights[i] / sum
@@ -112,7 +130,7 @@ def getSamplesFromIndexes(indexes, points):
 def computeDegeneracy(weights):
     nEff = 0
     for i in range(0, len(weights)):
-        nEff += weights[i]**2
+        nEff += weights[i] ** 2
     return 1 / nEff
 
 
@@ -121,9 +139,9 @@ def completeSystematicResampling(samples, weights):
     cumulativeDist = []
     cumulativeDist.append(weights[0])
     for i in range(1, n):
-        cumulativeDist.append(weights[i] + cumulativeDist[i-1])
+        cumulativeDist.append(weights[i] + cumulativeDist[i - 1])
 
-    unif = np.random.uniform(0, 1/n)
+    unif = np.random.uniform(0, 1 / n)
 
     i = 1
     newSamples = []
@@ -135,25 +153,50 @@ def completeSystematicResampling(samples, weights):
     return newSamples
 
 
-
-
 # credit: https://stackoverflow.com/questions/1185408/converting-from-longitude-latitude-to-cartesian-coordinates
 def get_cartesian(point):
     lat = point[0]
     lon = point[1]
     lat, lon = np.deg2rad(lat), np.deg2rad(lon)
-    R = 6371 # radius of the earth
+    R = 6371  # radius of the earth
     x = R * np.cos(lat) * np.cos(lon)
     y = R * np.cos(lat) * np.sin(lon)
     z = R * np.sin(lat)
-    return [x,y,z]
+    return [x, y, z]
 
 
 # credit: https://stackoverflow.com/questions/56945401/converting-xyz-coordinates-to-longitutde-latitude-in-python
-def get_latlon(x,y,z):
+def get_latlon(x, y, z):
     R = 6371
     lat = np.degrees(np.arcsin(z / R))
     lon = np.degrees(np.arctan2(y, x))
+
+
+####################################################################
+
+def multinomialResampling(points, weights):
+    newPoints = []
+    N_samples = len(points)
+    n = 0
+
+    cumulativeDist = []
+    cumulativeDist.append(weights[0])
+    for i in range(1, N_samples):
+        cumulativeDist.append(weights[i] + cumulativeDist[i - 1])
+
+    while n < N_samples:
+        u = np.random.uniform(0, 1)
+        m = 0
+
+        while cumulativeDist[m] < u:
+            m += 1
+        n += 1
+        newPoints.append(points[m])
+
+    for i in range(0, N_samples):
+        weights[i] = 1 / N_samples
+    return newPoints, weights
+
 
 
 # def particle_filter_v1():
@@ -185,11 +228,13 @@ def particle_filter_v2(sampleSize):
     points = [point_on_triangle2(gateways[0], gateways[1], gateways[2]) for _ in range(sampleSize)]
     lats, longs = zip(*points)
     plt.scatter(longs, lats, s=0.1)
-    #plt.hist2d(longs, lats)
+    # plt.hist2d(longs, lats)
     plt.show()
 
+    pointIter = []
+
     # change reading
-    for i in range(2, len(sensorSet)):
+    for i in range(0, len(sensorSet)):
         # get RSSI of reading, here I use the diff of lat long for simulation
         readingMeasurement = []
         readingMeasurement.append(distanceBetweenCoords(sensorSet[i], gateways[0]))
@@ -197,7 +242,7 @@ def particle_filter_v2(sampleSize):
         readingMeasurement.append(distanceBetweenCoords(sensorSet[i], gateways[2]))
 
         # train to reading
-        for j in range(0, 100):
+        for j in range(0, 10):
 
             # get weights based on closeness to original reading
             weights = weightsMeasureRelativetoSensor(readingMeasurement, points)
@@ -206,15 +251,13 @@ def particle_filter_v2(sampleSize):
 
             # Check for Degeneracy
             nEff = computeDegeneracy(weights)
-            #print("Neff: ", nEff)
-            #if (sampleSize - nEff) / sampleSize > 0.8:
+            # print("Neff: ", nEff)
+            # if (sampleSize - nEff) / sampleSize > 0.8:
 
-            if nEff < sampleSize / 4:
-                print('regen\n')
+            if nEff < sampleSize / 2:
                 # TODO need to check
                 # points = completeSystematicResampling(points, weights)
-                for k in range(0, len(weights)):
-                    weights[k] = 1 / sampleSize
+                points, weights = multinomialResampling(points, weights)
             else:
                 # Generate Indexes of new Sample
                 weightedSample = sampleByWeight(weights, list(range(0, sampleSize)), sampleSize)
@@ -222,13 +265,15 @@ def particle_filter_v2(sampleSize):
                 # Create new sample from indexes
                 points = getSamplesFromIndexes(weightedSample, points)
 
+        print("iter: ", i, "\n", points[0:5])
         lats, longs = zip(*points)
-        plt.scatter(longs, lats, s=0.1)
-        #plt.hist2d(longs, lats)
+        plt.scatter(longs, lats, s=0.8)
+        # plt.hist2d(longs, lats)
         plt.show()
+
 
 ################################################
 
 particle_filter_v2(1000)
 
-#print(rssiInfoFromSensor([-25.75285636635823,28.24830651283264]))
+# print(rssiInfoFromSensor([-25.75285636635823,28.24830651283264]))
