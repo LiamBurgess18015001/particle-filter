@@ -155,6 +155,8 @@ def computeDegeneracy(weights):
         nEff += weights[i] ** 2
     return 1 / nEff
 
+##########################################################
+
 
 def completeSystematicResampling(samples, weights):
     n = len(weights)
@@ -227,6 +229,30 @@ def stratifiedResampling(points, weights):
 
 ####################################################################
 
+def randomWalk(points):
+    N = len(points)
+    newPoint = []
+    for i in range(0, N):
+        rand = np.random.uniform(0.0000000001, 0.000001)
+        if np.random.randint(0, 1):
+            newPoint.append([points[i][0] + rand, points[i][1] + rand])
+        else:
+            newPoint.append([points[i][0] - rand, points[i][1] - rand])
+    return points
+
+
+####################################################################
+
+def resampleProportion(points, howMany):
+    N = len(points)
+    newPoints = [point_on_triangle2(gateways[0], gateways[1], gateways[2]) for _ in range(N - howMany)]
+    oldPoints = points[:howMany]
+    newPoints = newPoints + oldPoints
+    return newPoints
+
+
+####################################################################
+
 # def particle_filter_v1():
 #     pt1 = (28.248, -25.75307)
 #     pt1 = get_cartesian(pt1)
@@ -270,7 +296,7 @@ def particle_filter_v2(sampleSize):
         readingMeasurement.append(distanceBetweenCoords(sensorSet[i], gateways[2]))
 
         # train to reading
-        for j in range(0, 5):
+        for j in range(0, 8):
 
             # get weights based on closeness to original reading
             weights = weightsMeasureRelativetoSensor(readingMeasurement, points)
@@ -293,6 +319,9 @@ def particle_filter_v2(sampleSize):
                 # Create new sample from indexes
                 points = getSamplesFromIndexes(weightedSample, points)
 
+            points = resampleProportion(points, int(np.floor(sampleSize / 4)))
+
+        #points = randomWalk(points)
         print("iter: ", i, "\n", points[0:5])
         lats, longs = zip(*points)
         plt.scatter(longs, lats, s=0.8)
@@ -301,7 +330,8 @@ def particle_filter_v2(sampleSize):
 
 
 ################################################
-
+random.seed(1000)
+np.random.seed(1000)
 particle_filter_v2(1000)
 
 # print(rssiInfoFromSensor([-25.75285636635823,28.24830651283264]))
