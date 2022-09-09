@@ -408,6 +408,12 @@ def printGeoJson(point):
     print('{"type": "Feature","properties": {"marker-color": "#d62929","marker-size": "medium","marker-symbol": ""},"geometry": {"type": "Point","coordinates": ['+str(point[0])+','+str(point[1])+']}},')
 
 
+def genGeoJsonFile(points, iteration):
+    with open("Geojson/"+str(iteration)+".geojson", "w") as file:
+        for i in range(0, len(points)):
+            file.write('{"type": "Feature","properties": {"marker-color": "#d62929","marker-size": "medium","marker-symbol": ""},"geometry": {"type": "Point","coordinates": ['+str(points[i][0])+','+str(points[i][1])+']}},')
+    file.close()
+
 ####################################################################
 
 # def particle_filter_v1():
@@ -494,15 +500,16 @@ def particle_filter_v3(sampleSize):
     errors = []
     # sample uniform particles
     points = points_in_polygon(Polygon(reservePerimeter), sampleSize)
-    # lats, longs = zip(*points)
+    lats, longs = zip(*points)
     # plt.scatter(longs, lats, s=0.1)
-    # # plt.hist2d(longs, lats)
-    # plt.show()
+    plt.hist2d(longs, lats)
+    plt.show()
 
     pointIter = []
 
     # change reading
     for i in range(0, len(sensorSet)):
+        iterationError = []
         readingMeasurement = []
 
         # get RSSI of reading, here I use the diff of lat long for simulation
@@ -513,7 +520,7 @@ def particle_filter_v3(sampleSize):
         points = randomWalk(points)
 
         # train to reading
-        for j in range(0, 25):
+        for j in range(0, 50):
 
             # get weights based on closeness to original reading
             weights = weightsMeasureRelativetoSensor(readingMeasurement, points)
@@ -522,13 +529,8 @@ def particle_filter_v3(sampleSize):
 
             # Check for Degeneracy
             nEff = computeDegeneracy(weights)
-            # print("Neff: ", nEff)
-            # if (sampleSize - nEff) / sampleSize > 0.8:
-
             if nEff < sampleSize / 4:
                 #print("regen")
-                # TODO need to check
-                # points = completeSystematicResampling(points, weights)
                 points, weights = stratifiedResampling(points, weights)
             else:
                 # Generate Indexes of new Sample
@@ -537,19 +539,32 @@ def particle_filter_v3(sampleSize):
                 # Create new sample from indexes
                 points = getSamplesFromIndexes(weightedSample, points)
 
+            max = np.argmax(weights)
+            iterationError.append(relativeError(sensorSet[i], points[max]))
+
             #points = resampleProportion(points, int(np.floor(sampleSize / 8)))
 
-        #points = randomWalk(points)
-        #print("iter: ", i, "\n")#, points[0:5])
+        #genGeoJsonFile(points, i)
+
+        # error graphing
+        # referenceX = [sensorSet[i][1]] * 8
+        # referenceY = [sensorSet[i][0]] * 8
+        # y, x = zip(*iterationError)
+        # plt.plot(range(0, 10), x, color='r', label='')
+        # plt.plot(range(0, 10), y, color='g', label='')
+        # plt.show()
+
         # printGeoJson(points[1])
         max = np.argmax(weights)
-        printGeoJson(points[max])
+        #printGeoJson(points[max])
         lats, longs = zip(*points)
-        # plt.scatter(longs, lats, s=0.8)
-        plt.hist2d(longs, lats)
+        plt.imshow((lats, longs), cmap="hot", interpolation="nearest")
+        #plt.scatter(longs, lats, s=0.8)
+        #plt.hist2d(longs, lats)
+
         plt.show()
-        errors.append(relativeError(sensorSet[i], points[max]))
-    print(errors)
+        #errors.append(relativeError(sensorSet[i], points[max]))
+    #print(errors)
 
 
 
@@ -558,7 +573,7 @@ def particle_filter_v3(sampleSize):
 
 random.seed(1000)
 np.random.seed(1000)
-particle_filter_v3(1000)
+particle_filter_v3(10000)
 
 # print(rssiInfoFromSensor([-25.75285636635823,28.24830651283264]))
 
