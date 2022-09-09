@@ -2,17 +2,12 @@ import random
 import math as math
 import numpy as np
 import matplotlib.pyplot as plt
+from shapely.geometry import Point, Polygon
 
+################################################
 # gateways = [[-25.75307, 28.248],
 #            [-25.75271, 28.24802],
 #            [-25.75277, 28.24867]]
-
-gateways = [[28.251326680183407,
-             -25.750026219611552],
-            [28.250766098499298,
-             -25.7485911898637],
-            [28.249990940093994,
-             -25.74900189038381]]
 
 # sensorSet = [[-25.752857574259657, 28.24808120727539],
 #              [-25.752857574259657, 28.24814021587372],
@@ -25,16 +20,123 @@ gateways = [[28.251326680183407,
 #              [-25.75295058263169, 28.248509019613266],
 #              [-25.75290951400886, 28.248547911643982]]
 
-sensorSet = [[28.25106382369995,
-              -25.74964209718626],
-             [28.25086534023285,
-              -25.749335281526573],
-             [28.250790238380432,
-              -25.748929413924614],
-             [28.25038254261017,
-              -25.748861769189467],
-             [28.25036108493805,
-              -25.74919032897078]]
+################################################
+
+# gateways = [[28.251326680183407,
+#              -25.750026219611552],
+#             [28.250766098499298,
+#              -25.7485911898637],
+#             [28.249990940093994,
+#              -25.74900189038381]]
+
+# sensorSet = [[28.25106382369995,
+#               -25.74964209718626],
+#              [28.25086534023285,
+#               -25.749335281526573],
+#              [28.250790238380432,
+#               -25.748929413924614],
+#              [28.25038254261017,
+#               -25.748861769189467],
+#              [28.25036108493805,
+#               -25.74919032897078]]
+
+################################################
+
+gateways = [
+            [
+              28.250527381896973,
+              -25.748791708530312
+            ],
+            [
+              28.249475955963135,
+              -25.748482474782456
+            ],
+            [
+              28.249014616012573,
+              -25.74928454815217
+            ],
+            [
+              28.250334262847897,
+              -25.749487481519804
+            ],
+            [
+              28.250527381896973,
+              -25.748791708530312
+            ]
+          ]
+
+sensorSet = [
+          [
+            28.250248432159424,
+            -25.749390846626067
+          ],
+          [
+            28.24955105781555,
+            -25.749313538654487
+          ],
+          [
+            28.248800039291382,
+            -25.749265221146686
+          ],
+          [
+            28.24913263320923,
+            -25.749004306265018
+          ],
+          [
+            28.249422311782837,
+            -25.748704736620095
+          ],
+          [
+            28.249701261520386,
+            -25.74850180191528
+          ],
+          [
+            28.25006604194641,
+            -25.748695073070593
+          ],
+          [
+            28.250291347503662,
+            -25.74901396978938
+          ],
+          [
+            28.24986219406128,
+            -25.74901396978938
+          ],
+          [
+            28.249958753585815,
+            -25.749158922560373
+          ],
+          [
+            28.249980211257935,
+            -25.749487481519804
+          ]
+        ]
+
+reservePerimeter = [
+            [
+              28.25060248374939,
+              -25.749709741477048
+            ],
+            [
+              28.25075268745422,
+              -25.7486177646462
+            ],
+            [
+              28.249357938766476,
+              -25.748182903821597
+            ],
+            [
+              28.248413801193237,
+              -25.74940051011898
+            ],
+            [
+              28.25060248374939,
+              -25.749709741477048
+            ]
+          ]
+
+minMax = [[],[]]
+
 
 base_factor = -61.1
 env_factor = 2
@@ -100,6 +202,36 @@ def point_on_triangle2(pt1, pt2, pt3):
         # pt1[2] + pt2[2] + pt3[2] / 3
     )
 
+# credit: https://www.matecdev.com/posts/random-points-in-polygon.html
+def points_in_polygon(polygon, number):
+    points = []
+    minx, miny, maxx, maxy = polygon.bounds
+    while len(points) < number:
+        pnt = Point(np.random.uniform(minx, maxx), np.random.uniform(miny, maxy))
+        if polygon.contains(pnt):
+            points.append(pnt.coords[:][0])
+    return points[:]
+
+
+def minMaxLatLong():
+    # small lat
+    minMax[0][0] = gateways[0][1]
+    # large lat
+    minMax[0][1] = gateways[0][1]
+    # small long
+    minMax[1][0] = gateways[0][0]
+    # large long
+    minMax[1][1] = gateways[0][0]
+    for i  in range(1, len(gateways)):
+        if gateways[i][1] < minMax[0][0]:
+            minMax[0][0] = gateways[i][1]
+        elif gateways[i][1] > minMax[0][1]:
+            minMax[0][1] = gateways[i][1]
+        if gateways[i][0] < minMax[1][0]:
+            minMax[1][0] = gateways[i][0]
+        elif gateways[i][0] > minMax[1][1]:
+            minMax[1][1] = gateways[i][0]
+
 
 def weightsMeasureRelativetoSensor(OriginalPoint, RandomPoints):
     n = len(RandomPoints)
@@ -107,16 +239,20 @@ def weightsMeasureRelativetoSensor(OriginalPoint, RandomPoints):
     for i in range(0, n):
         # Get Dists of Particle
         RandomParticleToCompare = []
-        RandomParticleToCompare.append(distanceBetweenCoords(RandomPoints[i], gateways[0]))
-        RandomParticleToCompare.append(distanceBetweenCoords(RandomPoints[i], gateways[1]))
-        RandomParticleToCompare.append(distanceBetweenCoords(RandomPoints[i], gateways[2]))
+        for j in range(0, len(gateways)):
+            RandomParticleToCompare.append(distanceBetweenCoords(RandomPoints[i], gateways[j]))
         # Weight against original
         weights.append(weightDistanceEuclidean(OriginalPoint, RandomParticleToCompare))
     return weights
 
 
 def weightDistanceEuclidean(sensor, point):
-    divider = np.sqrt((sensor[0] - point[0]) ** 2 + (sensor[1] - point[1]) ** 2)
+    sums = 0
+    # for i in range(0, len(sensor)):
+    #     abs(sensor[i] - point[i])
+    for i in range(0, len(sensor)):
+        sums += (sensor[i] - point[i])**2
+    divider = np.sqrt(sums)
     # bound the upper limit
     if divider < 0.000001:
         return 100000
@@ -233,12 +369,22 @@ def randomWalk(points):
     N = len(points)
     newPoint = []
     for i in range(0, N):
-        rand = np.random.uniform(0.0000000001, 0.000001)
-        if np.random.randint(0, 1):
-            newPoint.append([points[i][0] + rand, points[i][1] + rand])
+        rand1 = np.random.uniform(0.0001, 0.001)
+        rand2 = np.random.uniform(0.0001, 0.001)
+        choice = np.random.randint(0,4)
+        if choice == 0:
+            newPoint.append([points[i][0] + rand1, points[i][1] + rand2])
+        elif choice == 1:
+            newPoint.append([points[i][0] + rand1, points[i][1] - rand2])
+        elif choice == 2:
+            newPoint.append([points[i][0] - rand1, points[i][1] + rand2])
         else:
-            newPoint.append([points[i][0] - rand, points[i][1] - rand])
-    return points
+            newPoint.append([points[i][0] - rand1, points[i][1] - rand2])
+    #     if np.random.randint(0, 1):
+    #         newPoint.append([points[i][0] + rand, points[i][1] - rand])
+    #     else:
+    #         newPoint.append([points[i][0] + rand, points[i][1] - rand])
+    return newPoint
 
 
 ####################################################################
@@ -249,6 +395,17 @@ def resampleProportion(points, howMany):
     oldPoints = points[:howMany]
     newPoints = newPoints + oldPoints
     return newPoints
+
+
+def relativeError(point, estimate):
+    error = []
+    for i in range(0, len(point)):
+        error.append((abs(point[i] - estimate[i]) / abs(point[i]))*1000000)
+    return error
+
+
+def printGeoJson(point):
+    print('{"type": "Feature","properties": {"marker-color": "#d62929","marker-size": "medium","marker-symbol": ""},"geometry": {"type": "Point","coordinates": ['+str(point[0])+','+str(point[1])+']}},')
 
 
 ####################################################################
@@ -277,26 +434,86 @@ def resampleProportion(points, howMany):
 
 ####################################################
 # with degeneracy adjustments
-def particle_filter_v2(sampleSize):
+# def particle_filter_v2(sampleSize):
+#     # sample uniform particles
+#     points = [point_on_triangle2(gateways[0], gateways[1], gateways[2]) for _ in range(sampleSize)]
+#     lats, longs = zip(*points)
+#     plt.scatter(longs, lats, s=0.1)
+#     # plt.hist2d(longs, lats)
+#     plt.show()
+#
+#     pointIter = []
+#
+#     # change reading
+#     for i in range(4, len(sensorSet)):
+#         # get RSSI of reading, here I use the diff of lat long for simulation
+#         readingMeasurement = []
+#         readingMeasurement.append(distanceBetweenCoords(sensorSet[i], gateways[0]))
+#         readingMeasurement.append(distanceBetweenCoords(sensorSet[i], gateways[1]))
+#         readingMeasurement.append(distanceBetweenCoords(sensorSet[i], gateways[2]))
+#
+#         # random walk
+#         points = randomWalk(points)
+#
+#         # train to reading
+#         for j in range(0, 100):
+#
+#             # get weights based on closeness to original reading
+#             weights = weightsMeasureRelativetoSensor(readingMeasurement, points)
+#             # Normalize to a distribution
+#             weights = normalizeWeights(weights)
+#
+#             # Check for Degeneracy
+#             nEff = computeDegeneracy(weights)
+#             # print("Neff: ", nEff)
+#             # if (sampleSize - nEff) / sampleSize > 0.8:
+#
+#             if nEff < sampleSize / 2:
+#                 # points = completeSystematicResampling(points, weights)
+#                 points, weights = stratifiedResampling(points, weights)
+#             else:
+#                 # Generate Indexes of new Sample
+#                 weightedSample = sampleByWeight(weights, list(range(0, sampleSize)), sampleSize)
+#
+#                 # Create new sample from indexes
+#                 points = getSamplesFromIndexes(weightedSample, points)
+#
+#             #points = resampleProportion(points, int(np.floor(sampleSize / 8)))
+#
+#         #points = randomWalk(points)
+#         #print("iter: ", i, "\n")#, points[0:5])
+#         printGeoJson(points[1])
+#         lats, longs = zip(*points)
+#         plt.scatter(longs, lats, s=0.8)
+#         # plt.hist2d(longs, lats)
+#         plt.show()
+
+################################################
+# Random walk, polygon sampling and more than three gateway measurements
+def particle_filter_v3(sampleSize):
+    errors = []
     # sample uniform particles
-    points = [point_on_triangle2(gateways[0], gateways[1], gateways[2]) for _ in range(sampleSize)]
-    lats, longs = zip(*points)
-    plt.scatter(longs, lats, s=0.1)
-    # plt.hist2d(longs, lats)
-    plt.show()
+    points = points_in_polygon(Polygon(reservePerimeter), sampleSize)
+    # lats, longs = zip(*points)
+    # plt.scatter(longs, lats, s=0.1)
+    # # plt.hist2d(longs, lats)
+    # plt.show()
 
     pointIter = []
 
     # change reading
     for i in range(0, len(sensorSet)):
-        # get RSSI of reading, here I use the diff of lat long for simulation
         readingMeasurement = []
-        readingMeasurement.append(distanceBetweenCoords(sensorSet[i], gateways[0]))
-        readingMeasurement.append(distanceBetweenCoords(sensorSet[i], gateways[1]))
-        readingMeasurement.append(distanceBetweenCoords(sensorSet[i], gateways[2]))
+
+        # get RSSI of reading, here I use the diff of lat long for simulation
+        for j in range(0, len(gateways)):
+            readingMeasurement.append(distanceBetweenCoords(sensorSet[i], gateways[j]))
+
+        # random walk
+        points = randomWalk(points)
 
         # train to reading
-        for j in range(0, 8):
+        for j in range(0, 25):
 
             # get weights based on closeness to original reading
             weights = weightsMeasureRelativetoSensor(readingMeasurement, points)
@@ -308,7 +525,8 @@ def particle_filter_v2(sampleSize):
             # print("Neff: ", nEff)
             # if (sampleSize - nEff) / sampleSize > 0.8:
 
-            if nEff < sampleSize / 2:
+            if nEff < sampleSize / 4:
+                #print("regen")
                 # TODO need to check
                 # points = completeSystematicResampling(points, weights)
                 points, weights = stratifiedResampling(points, weights)
@@ -319,19 +537,28 @@ def particle_filter_v2(sampleSize):
                 # Create new sample from indexes
                 points = getSamplesFromIndexes(weightedSample, points)
 
-            points = resampleProportion(points, int(np.floor(sampleSize / 4)))
+            #points = resampleProportion(points, int(np.floor(sampleSize / 8)))
 
         #points = randomWalk(points)
-        print("iter: ", i, "\n", points[0:5])
+        #print("iter: ", i, "\n")#, points[0:5])
+        # printGeoJson(points[1])
+        max = np.argmax(weights)
+        printGeoJson(points[max])
         lats, longs = zip(*points)
-        plt.scatter(longs, lats, s=0.8)
-        # plt.hist2d(longs, lats)
+        # plt.scatter(longs, lats, s=0.8)
+        plt.hist2d(longs, lats)
         plt.show()
+        errors.append(relativeError(sensorSet[i], points[max]))
+    print(errors)
+
 
 
 ################################################
+
+
 random.seed(1000)
 np.random.seed(1000)
-particle_filter_v2(1000)
+particle_filter_v3(1000)
 
 # print(rssiInfoFromSensor([-25.75285636635823,28.24830651283264]))
+
